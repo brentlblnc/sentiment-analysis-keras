@@ -15,6 +15,7 @@ from tensorflow.keras import utils
 import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
 import tensorflow_datasets as tfds
+from requests_html import HTMLSession
 
 # Root directory of project files
 DATA_PATH = Path(__file__).resolve().parent
@@ -109,15 +110,37 @@ def compute_results(train_dataset, test_dataset, model):
     return history
 
 
+def get_article_body(link, css_selector):
+    article_body = []
+    session = HTMLSession()
+    res = session.get(link)
+    article = res.html.find(css_selector)
+    for paragraph in article:
+        article_body.append(paragraph.text)
+
+    return article_body
+
+
 if __name__ == "__main__":
-    # try:
-    #     model = load_model(DATA_PATH + "my_model")
-    #     # print("Model loaded successfully")
-    # except OSError:
-    train_dataset, test_dataset = retrieve_data()
-    model = build_model(train_dataset)
-    results = compute_results(train_dataset, test_dataset, model)
-    plot_results(results, "accuracy")
-    plot_results(results, "loss")
-    print(model.predict(["Bad"]))
+    model = load_model(DATA_PATH / "my_model")
+
+    # train_dataset, test_dataset = retrieve_data()
+    # model = build_model(train_dataset)
+    # results = compute_results(train_dataset, test_dataset, model)
+    # plot_results(results, "accuracy")
+    # plot_results(results, "loss")
+
+    op_ed_links = ["https://www.nytimes.com/2021/01/06/opinion/protests-trump-disinformation.html",
+                   "https://www.nytimes.com/2021/01/06/opinion/georgia-senate-election.html",
+                   "https://www.nytimes.com/2021/01/05/opinion/trump-republicans-election.html"]
+
+    op_eds = []
+
+    for link in op_ed_links:
+        op_ed = get_article_body(link, "p.css-axufdj.evys1bk0")
+        op_eds.append(op_ed)
+
+    np.save(DATA_PATH + "op_eds", op_eds)
+
+
 
