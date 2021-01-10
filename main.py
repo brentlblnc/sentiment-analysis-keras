@@ -105,7 +105,7 @@ def compute_results(train_dataset, test_dataset, model):
     print(f"Test Loss: {test_loss}")
     print(f"Test Accuracy: {test_accuracy}")
 
-    #model.save(DATA_PATH + "my_model")
+    #model.save(DATA_PATH / "outputs/my_model")
 
     return history
 
@@ -115,8 +115,7 @@ def get_article_body(link, css_selector):
     session = HTMLSession()
     res = session.get(link)
     article = res.html.find(css_selector)
-    for paragraph in article:
-        article_body.append(paragraph.text)
+    article_body = [paragraph.text for paragraph in article]
 
     return article_body
 
@@ -130,17 +129,70 @@ if __name__ == "__main__":
     # plot_results(results, "accuracy")
     # plot_results(results, "loss")
 
-    op_ed_links = ["https://www.nytimes.com/2021/01/06/opinion/protests-trump-disinformation.html",
-                   "https://www.nytimes.com/2021/01/06/opinion/georgia-senate-election.html",
-                   "https://www.nytimes.com/2021/01/05/opinion/trump-republicans-election.html"]
+    # op_eds = []
 
-    op_eds = []
+    # link_1 = "https://www.cbc.ca/news/canada/manitoba/teresa-moysey-united-church-opinion-manitoba-1.5856794"
+    # op_ed_1 = get_article_body(link_1, "div.story > span > p")
+    # op_eds.append(op_ed_1)
 
-    for link in op_ed_links:
-        op_ed = get_article_body(link, "p.css-axufdj.evys1bk0")
-        op_eds.append(op_ed)
+    # link_2 = "https://www.cbc.ca/news/canada/manitoba/opinion-madhav-sinha-vaccination-plan-quality-1.5845930"
+    # op_ed_2 = get_article_body(link_2, "div.story > span > p")
+    # op_eds.append(op_ed_2)
 
-    np.save(DATA_PATH + "op_eds", op_eds)
+    # link_3 = "https://www.thestar.com/opinion/editorials/2021/01/07/curfew-would-be-dramatic-but-an-admission-of-failure-in-fight-against-covid-19.html"
+    # op_ed_3 = get_article_body(link_3, "div.c-article-body__content > p.text-block-container")
+    # op_eds.append(op_ed_3)
+
+    # link_4 = "https://www.cnn.com/2021/01/05/opinions/uk-delay-second-covid-vaccine-dose-moore/index.html"
+    # op_ed_4 = get_article_body(link_4, "div.zn-body__paragraph")
+    # op_eds.append(op_ed_4)
+
+    # np.save(DATA_PATH + "op_eds", op_eds)
+
+    # papers = []
+
+    # link_5 = "https://www.nejm.org/doi/10.1056/NEJMoa2035389"
+    # paper_1 = get_article_body(link_5, "p.f-body, p.f-body--sm")
+    # papers.append(paper_1)
+
+    # link_6 = "https://www.nejm.org/doi/full/10.1056/NEJMoa2034545"
+    # paper_2 = get_article_body(link_6, "p.f-body, p.f-body--sm")
+    # papers.append(paper_2)
+
+    # link_7 = "https://www.nejm.org/doi/full/10.1056/NEJMoa2016638"
+    # paper_3 = get_article_body(link_7, "p.f-body, p.f-body--sm")
+    # papers.append(paper_3)
+
+    # link_8 = "https://www.nejm.org/doi/full/10.1056/NEJMoa2019375"
+    # paper_4 = get_article_body(link_8, "p.f-body, p.f-body--sm")
+    # papers.append(paper_4)
+
+    # np.save(DATA_PATH + "papers", papers)
+
+    # short_stories = []
+
+    # link_9 = "https://www.freechildrenstories.com/the-great-hill"
+    # story_1 = get_article_body(link_9, "div.sqs-block-content > p")
+    # short_stories.append(story_1)
+
+    # link_10 = "https://www.freechildrenstories.com/the-particular-way-of-the-odd-ms-mckay"
+    # story_2 = get_article_body(link_10, "div.sqs-block-content > p")
+    # short_stories.append(story_2)
+
+    # link_11 = "https://www.freechildrenstories.com/the-stellar-one-1"
+    # story_3 = get_article_body(link_11, "div.sqs-block-content > p")
+    # short_stories.append(story_3)
+
+    # link_12 = "https://www.freechildrenstories.com/king-michael"
+    # story_4 = get_article_body(link_12, "div.sqs-block-content > p")
+    # short_stories.append(story_4)
+
+    # np.save(DATA_PATH + "short_stories", short_stories)
+
+    # for story in np.load(DATA_PATH + "short_stories.npy", allow_pickle=True):
+    #   prediction = model.predict(story)
+    #   print(prediction)
+    #   print(np.mean(prediction))
 
 
 
