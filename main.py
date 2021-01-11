@@ -18,7 +18,7 @@ import tensorflow_datasets as tfds
 from requests_html import HTMLSession
 
 # Root directory of project files
-DATA_PATH = Path(__file__).resolve().parent
+ROOT = Path(__file__).resolve().parent
 
 LABEL_REGEX = "__label__[1|2] "
 BUFFER_SIZE = 1000
@@ -36,14 +36,14 @@ tf.random.set_seed(3)
 # https://stackoverflow.com/questions/10377998/how-can-i-iterate-over-files-in-a-given-directory
 # https://www.tensorflow.org/tutorials/text/text_classification_rnn
 
-def plot_results(results, metric):
+def plot_model_results(results, metric):
     plt.plot(results.history[metric])
     plt.plot(results.history[f"val_{metric}"])
     plt.title(f"model {metric}")
     plt.ylabel(metric)
     plt.xlabel("epoch")
     plt.legend(['Train', 'Validation'], loc='upper left')
-    plt.savefig(DATA_PATH / f"figs/model_{metric}")
+    plt.savefig(ROOT / f"figs/model_{metric}")
     plt.show()
 
 
@@ -60,7 +60,7 @@ def separate_data(dataset):
 
 
 def retrieve_data():
-    with open(DATA_PATH / "data/train.ft.txt", encoding="utf-8") as tr, open(DATA_PATH / "data/test.ft.txt",
+    with open(ROOT / "data/train.ft.txt", encoding="utf-8") as tr, open(ROOT / "data/test.ft.txt",
                                                                         encoding="utf-8") as te:
         train_dataset = tr.read().split("\n")[:TRAIN_SIZE]
         test_dataset = te.read().split("\n")[:TEST_SIZE]
@@ -105,13 +105,74 @@ def compute_results(train_dataset, test_dataset, model):
     print(f"Test Loss: {test_loss}")
     print(f"Test Accuracy: {test_accuracy}")
 
-    #model.save(DATA_PATH / "outputs/my_model")
+    # model.save(ROOT / "outputs/my_model")
 
     return history
 
 
+def web_scrape_text():
+    op_eds = []
+
+    link_1 = "https://www.cbc.ca/news/canada/manitoba/teresa-moysey-united-church-opinion-manitoba-1.5856794"
+    op_ed_1 = get_article_body(link_1, "div.story > span > p")
+    op_eds.append(op_ed_1)
+
+    link_2 = "https://www.cbc.ca/news/canada/manitoba/opinion-madhav-sinha-vaccination-plan-quality-1.5845930"
+    op_ed_2 = get_article_body(link_2, "div.story > span > p")
+    op_eds.append(op_ed_2)
+
+    link_3 = "https://www.thestar.com/opinion/editorials/2021/01/07/curfew-would-be-dramatic-but-an-admission-of-failure-in-fight-against-covid-19.html"
+    op_ed_3 = get_article_body(link_3, "div.c-article-body__content > p.text-block-container")
+    op_eds.append(op_ed_3)
+
+    link_4 = "https://www.cnn.com/2021/01/05/opinions/uk-delay-second-covid-vaccine-dose-moore/index.html"
+    op_ed_4 = get_article_body(link_4, "div.zn-body__paragraph")
+    op_eds.append(op_ed_4)
+
+    np.save(ROOT / "data/op_eds.npy", op_eds)
+
+    papers = []
+
+    link_5 = "https://www.nejm.org/doi/10.1056/NEJMoa2035389"
+    paper_1 = get_article_body(link_5, "p.f-body, p.f-body--sm")
+    papers.append(paper_1)
+
+    link_6 = "https://www.nejm.org/doi/full/10.1056/NEJMoa2034545"
+    paper_2 = get_article_body(link_6, "p.f-body, p.f-body--sm")
+    papers.append(paper_2)
+
+    link_7 = "https://www.nejm.org/doi/full/10.1056/NEJMoa2016638"
+    paper_3 = get_article_body(link_7, "p.f-body, p.f-body--sm")
+    papers.append(paper_3)
+
+    link_8 = "https://www.nejm.org/doi/full/10.1056/NEJMoa2019375"
+    paper_4 = get_article_body(link_8, "p.f-body, p.f-body--sm")
+    papers.append(paper_4)
+
+    np.save(ROOT / "data/papers.npy", papers)
+
+    short_stories = []
+
+    link_9 = "https://www.freechildrenstories.com/the-great-hill"
+    story_1 = get_article_body(link_9, "div.sqs-block-content > p")
+    short_stories.append(story_1)
+
+    link_10 = "https://www.freechildrenstories.com/the-particular-way-of-the-odd-ms-mckay"
+    story_2 = get_article_body(link_10, "div.sqs-block-content > p")
+    short_stories.append(story_2)
+
+    link_11 = "https://www.freechildrenstories.com/the-stellar-one-1"
+    story_3 = get_article_body(link_11, "div.sqs-block-content > p")
+    short_stories.append(story_3)
+
+    link_12 = "https://www.freechildrenstories.com/king-michael"
+    story_4 = get_article_body(link_12, "div.sqs-block-content > p")
+    short_stories.append(story_4)
+
+    np.save(ROOT / "data/short_stories.npy", short_stories)
+
+
 def get_article_body(link, css_selector):
-    article_body = []
     session = HTMLSession()
     res = session.get(link)
     article = res.html.find(css_selector)
@@ -120,79 +181,35 @@ def get_article_body(link, css_selector):
     return article_body
 
 
+def plot_article_sentiment(article, title):
+  model = load_model(ROOT + "my_model")
+  predictions = model.predict(article)
+  plt.plot(predictions)
+  plt.axhline(y=np.mean(predictions), color='r', linestyle='--')
+  plt.title(f"Sentiment History: {title}")
+  plt.ylabel("sentiment")
+  plt.xlabel("paragraph")
+  plt.legend(['Sentiment History', 'Mean'], loc='upper left')
+  plt.show()
+
+
 if __name__ == "__main__":
-    model = load_model(DATA_PATH / "my_model")
+    train_dataset, test_dataset = retrieve_data()
+    model = build_model(train_dataset)
+    results = compute_results(train_dataset, test_dataset, model)
+    plot_model_results(results, "accuracy")
+    plot_model_results(results, "loss")
 
-    # train_dataset, test_dataset = retrieve_data()
-    # model = build_model(train_dataset)
-    # results = compute_results(train_dataset, test_dataset, model)
-    # plot_results(results, "accuracy")
-    # plot_results(results, "loss")
+    web_scrape_text()
 
-    # op_eds = []
+    for index, op_ed in enumerate(np.load(ROOT / "data/op_eds.npy", allow_pickle=True)):
+      plot_article_sentiment(op_ed, f"Sample Opinion Editorial #{index + 1}")
 
-    # link_1 = "https://www.cbc.ca/news/canada/manitoba/teresa-moysey-united-church-opinion-manitoba-1.5856794"
-    # op_ed_1 = get_article_body(link_1, "div.story > span > p")
-    # op_eds.append(op_ed_1)
+    for index, paper in enumerate(np.load(ROOT / "data/papers.npy", allow_pickle=True)):
+      plot_article_sentiment(paper, f"Sample Paper #{index + 1}")
 
-    # link_2 = "https://www.cbc.ca/news/canada/manitoba/opinion-madhav-sinha-vaccination-plan-quality-1.5845930"
-    # op_ed_2 = get_article_body(link_2, "div.story > span > p")
-    # op_eds.append(op_ed_2)
-
-    # link_3 = "https://www.thestar.com/opinion/editorials/2021/01/07/curfew-would-be-dramatic-but-an-admission-of-failure-in-fight-against-covid-19.html"
-    # op_ed_3 = get_article_body(link_3, "div.c-article-body__content > p.text-block-container")
-    # op_eds.append(op_ed_3)
-
-    # link_4 = "https://www.cnn.com/2021/01/05/opinions/uk-delay-second-covid-vaccine-dose-moore/index.html"
-    # op_ed_4 = get_article_body(link_4, "div.zn-body__paragraph")
-    # op_eds.append(op_ed_4)
-
-    # np.save(DATA_PATH + "op_eds", op_eds)
-
-    # papers = []
-
-    # link_5 = "https://www.nejm.org/doi/10.1056/NEJMoa2035389"
-    # paper_1 = get_article_body(link_5, "p.f-body, p.f-body--sm")
-    # papers.append(paper_1)
-
-    # link_6 = "https://www.nejm.org/doi/full/10.1056/NEJMoa2034545"
-    # paper_2 = get_article_body(link_6, "p.f-body, p.f-body--sm")
-    # papers.append(paper_2)
-
-    # link_7 = "https://www.nejm.org/doi/full/10.1056/NEJMoa2016638"
-    # paper_3 = get_article_body(link_7, "p.f-body, p.f-body--sm")
-    # papers.append(paper_3)
-
-    # link_8 = "https://www.nejm.org/doi/full/10.1056/NEJMoa2019375"
-    # paper_4 = get_article_body(link_8, "p.f-body, p.f-body--sm")
-    # papers.append(paper_4)
-
-    # np.save(DATA_PATH + "papers", papers)
-
-    # short_stories = []
-
-    # link_9 = "https://www.freechildrenstories.com/the-great-hill"
-    # story_1 = get_article_body(link_9, "div.sqs-block-content > p")
-    # short_stories.append(story_1)
-
-    # link_10 = "https://www.freechildrenstories.com/the-particular-way-of-the-odd-ms-mckay"
-    # story_2 = get_article_body(link_10, "div.sqs-block-content > p")
-    # short_stories.append(story_2)
-
-    # link_11 = "https://www.freechildrenstories.com/the-stellar-one-1"
-    # story_3 = get_article_body(link_11, "div.sqs-block-content > p")
-    # short_stories.append(story_3)
-
-    # link_12 = "https://www.freechildrenstories.com/king-michael"
-    # story_4 = get_article_body(link_12, "div.sqs-block-content > p")
-    # short_stories.append(story_4)
-
-    # np.save(DATA_PATH + "short_stories", short_stories)
-
-    # for story in np.load(DATA_PATH + "short_stories.npy", allow_pickle=True):
-    #   prediction = model.predict(story)
-    #   print(prediction)
-    #   print(np.mean(prediction))
+    for index, story in enumerate(np.load(ROOT / "data/short_stories.npy", allow_pickle=True)):
+      plot_article_sentiment(story, f"Sample Short Story #1{index + 1}")
 
 
 
