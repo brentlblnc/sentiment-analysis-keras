@@ -22,14 +22,14 @@ ROOT = Path(__file__).resolve().parent
 # We match each review against this regular expression to determine the review polarity
 LABEL_REGEX = "__label__[1|2] "
 
-BATCH_SIZE = 100
+BATCH_SIZE = 128
 VOCAB_SIZE = 1000
 
 # Number of training and testing samples
-TRAIN_SIZE = 1500000
-TEST_SIZE = 300000
+TRAIN_SIZE = 2000000
+TEST_SIZE = 400000
 
-EPOCHS = 11
+EPOCHS = 25
 
 np.random.seed(3)
 tf.random.set_seed(3)
@@ -41,6 +41,12 @@ tf.random.set_seed(3)
 
 
 def plot_model_results(results: History, metric: str) -> None:
+    """
+    Plots the specified model metrics against epochs during training, then saves the resultant plot to the figs folder.
+    :param results: A History object containing information about the model's metrics during the training process.
+    :param metric:  A string representing which metric to plot. May be passed in as "accuracy" or "loss."
+    """
+
     plt.plot(results.history[metric])
     plt.plot(results.history[f"val_{metric}"])
     plt.title(f"model {metric}")
@@ -52,6 +58,12 @@ def plot_model_results(results: History, metric: str) -> None:
 
 
 def separate_data(dataset: List[str]) -> Tuple[List[str], List[int]]:
+    """
+    Separates the dataset into input data (x) and targets (y).
+    :param dataset: A list containing the raw data from test.ft.txt or train.ft.txt.
+    :return: The tuple (x, y).
+    """
+
     x = []
     y = []
 
@@ -67,6 +79,11 @@ def separate_data(dataset: List[str]) -> Tuple[List[str], List[int]]:
 
 
 def retrieve_data() -> Tuple[PrefetchDataset, PrefetchDataset]:
+    """
+    Reads the contents of test.ft.txt and train.ft.txt into separate lists, and then prepares the data for training.
+    :return: The training and testing datasets contained in a tuple.
+    """
+
     with open(ROOT / "data/train.ft.txt", encoding="utf-8") as tr, open(ROOT / "data/test.ft.txt",
                                                                         encoding="utf-8") as te:
         # Read contents of train and test files and add individual reviews to corresponding list
@@ -77,7 +94,7 @@ def retrieve_data() -> Tuple[PrefetchDataset, PrefetchDataset]:
     x_train, y_train = separate_data(train_dataset)
     x_test, y_test = separate_data(test_dataset)
 
-    # Create Tensorflow datasets from slices of the reviews and polarities
+    # Create Tensorflow datasets from slices of the reviews and labels
     train_dataset = tf.data.Dataset.from_tensor_slices((x_train, y_train))
     test_dataset = tf.data.Dataset.from_tensor_slices((x_test, y_test))
 
@@ -100,6 +117,12 @@ def retrieve_data() -> Tuple[PrefetchDataset, PrefetchDataset]:
 
 
 def build_model(train_dataset: PrefetchDataset) -> Sequential:
+    """
+
+    :param train_dataset:
+    :return:
+    """
+
     encoder = TextVectorization(max_tokens=VOCAB_SIZE)
     encoder.adapt(train_dataset.map(lambda text, label: text))
 
@@ -115,6 +138,15 @@ def build_model(train_dataset: PrefetchDataset) -> Sequential:
 
 
 def compute_results(train_dataset: PrefetchDataset, test_dataset: PrefetchDataset, model: Sequential) -> History:
+    """
+    Configures and trains the model, then evaluates its accuracy against the test dataset. The trained model is saved
+    to the outputs folder.
+    :param train_dataset: A PrefetchDataset that the model will be trained on.
+    :param test_dataset: A PrefetchDataset that the model's accuracy will be evaluated against.
+    :param model: The Sequential object to be trained.
+    :return: A History object containing information about the model's metrics during the training process.
+    """
+
     model.compile(loss=BinaryCrossentropy(from_logits=True), optimizer=Adam(), metrics=["accuracy"])
 
     # Here we introduce an early stopping callback function that will cease training once the validation loss
@@ -138,18 +170,30 @@ def compute_results(train_dataset: PrefetchDataset, test_dataset: PrefetchDatase
 
 
 def get_article_body(url: str, css_selector: str) -> List[str]:
+    """
+    Extracts the text data from the article body.
+    :param url: The URL to the article.
+    :param css_selector: Targets all matching HTML elements containing text in the article body.
+    :return: A list of paragraphs from the article body.
+    """
+
     session = HTMLSession()
     # Send a GET request to the specified URL
     res = session.get(url)
     # Retrieve all HTML elements with the matching CSS selector
     article = res.html.find(css_selector)
-    # Extract the text content from each HTML element.
+    # Extract the text content from each HTML element; ignore if text is just an empty string
     article_body = [paragraph.text for paragraph in article if paragraph.text != '']
 
     return article_body
 
 
 def web_scrape_text() -> None:
+    """
+    Scrapes text from different categories of articles and saves the data into NumPy arrays. Each array is saved
+    into the data folder.
+    """
+
     # Initialize a two-dimensional list of opinion editorials
     op_eds = []
 
@@ -215,6 +259,14 @@ def web_scrape_text() -> None:
 
 
 def plot_article_sentiment(article: List[str], title: str, model: Sequential) -> None:
+    """
+    Plots the sentiment score (between 0 and 1; 0 indicating negative sentiment and 1 indicating positive sentiment)
+    against paragraphs for a given article. The plots are saved to the figs folder.
+    :param article: A list of paragraphs from the article body.
+    :param title: The title of the plot.
+    :param model: The trained model. Used to predict the sentiment of the article, paragraph-by-paragraph.
+    """
+
     predictions = model.predict(article)
     plt.plot(predictions)
     plt.axhline(y=np.mean(predictions), color="r", linestyle="--")
@@ -222,10 +274,11 @@ def plot_article_sentiment(article: List[str], title: str, model: Sequential) ->
     plt.ylabel("sentiment")
     plt.xlabel("paragraph")
     plt.legend(["Sentiment History", "Mean"], loc="upper left")
-    plt.savefig(ROOT / "data" / "_".join(title.split(" ")).lower())
+    plt.savefig(ROOT / "figs" / "_".join(title.split(" ")).lower())
     plt.show()
 
 
+# Main function
 if __name__ == "__main__":
     model = load_model(ROOT / "outputs/my_model")
 
@@ -236,7 +289,7 @@ if __name__ == "__main__":
     # plot_model_results(results, "accuracy")
     # plot_model_results(results, "loss")
 
-    # Uncomment the call to web_scrape_text() to re-scrape the text data and re-save it into numpy arrays
+    # Uncomment the call to web_scrape_text() to re-scrape the text data and re-save it into NumPy arrays
     # web_scrape_text()
 
     # For each category of text, plot the sentiment history of each article of text
