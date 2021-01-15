@@ -14,6 +14,7 @@ from tensorflow.keras.optimizers import Adam
 import matplotlib.pyplot as plt
 from requests_html import HTMLSession
 from typing import List, Tuple
+import pandas as pd
 
 # Root directory of project files
 ROOT = Path(__file__).resolve().parent
@@ -33,11 +34,6 @@ EPOCHS = 25
 
 np.random.seed(3)
 tf.random.set_seed(3)
-
-# *** CITATIONS ***
-# https://stackoverflow.com/questions/10377998/how-can-i-iterate-over-files-in-a-given-directory
-# https://www.tensorflow.org/tutorials/text/text_classification_rnn
-# https://stackoverflow.com/questions/46444018/meaning-of-buffer-size-in-dataset-map-dataset-prefetch-and-dataset-shuffle/48096625#48096625
 
 
 def plot_model_results(results: History, metric: str) -> None:
@@ -94,6 +90,8 @@ def retrieve_data() -> Tuple[PrefetchDataset, PrefetchDataset]:
     x_train, y_train = separate_data(train_dataset)
     x_test, y_test = separate_data(test_dataset)
 
+    # Input pipeline below built with the help of: https://www.tensorflow.org/tutorials/text/text_classification_rnn
+
     # Create Tensorflow datasets from slices of the reviews and labels
     train_dataset = tf.data.Dataset.from_tensor_slices((x_train, y_train))
     test_dataset = tf.data.Dataset.from_tensor_slices((x_test, y_test))
@@ -118,19 +116,28 @@ def retrieve_data() -> Tuple[PrefetchDataset, PrefetchDataset]:
 
 def build_model(train_dataset: PrefetchDataset) -> Sequential:
     """
-
-    :param train_dataset:
-    :return:
+    Initializes a Sequential model and adds text vectorization, word embedding, LSTM, and densely connected layers.
+    :param train_dataset: The dataset to adapt the vocabulary on.
+    :return: A Sequential object.
     """
 
+    # Initialize the TextVectorization layer which assigns integers to each token
     encoder = TextVectorization(max_tokens=VOCAB_SIZE)
+
+    # Set the vocabulary for the encoding layer. This will be used to initialize a lookup table of word embeddings.
+    # The code for this and subsequent layers adapted from:
+    # https://www.tensorflow.org/tutorials/text/text_classification_rnn#create_the_text_encoder
     encoder.adapt(train_dataset.map(lambda text, label: text))
 
     model = Sequential()
     model.add(encoder)
+    # Next we add our word embedding layer which converts token indices into dense vectors
     model.add(Embedding(input_dim=len(encoder.get_vocabulary()), output_dim=8, activity_regularizer=l2(0.001),
                         mask_zero=True))
+    # Bidirectional wrapper for LSTM allows data to be processed forwards and backwards and then concatenated into
+    # one output
     model.add(Bidirectional(LSTM(8)))
+    # Densely connected layers with L2 regularization to reduce over-fitting
     model.add(Dense(8, activation="relu", kernel_regularizer=l2(0.001), activity_regularizer=l2(0.001)))
     model.add(Dense(1, activation="sigmoid"))
 
@@ -150,8 +157,9 @@ def compute_results(train_dataset: PrefetchDataset, test_dataset: PrefetchDatase
     model.compile(loss=BinaryCrossentropy(from_logits=True), optimizer=Adam(), metrics=["accuracy"])
 
     # Here we introduce an early stopping callback function that will cease training once the validation loss
-    # stops decreasing. This is to minimize overfitting (i.e. reduce the difference between training loss
+    # stops decreasing. This is to minimize over-fitting (i.e. reduce the difference between training loss
     # and validation loss).
+    # Idea retrieved from https://machinelearningmastery.com/early-stopping-to-avoid-overtraining-neural-network-models/
     es_callback = EarlyStopping(monitor="val_loss", patience=3)
 
     # Train the model
@@ -205,57 +213,73 @@ def web_scrape_text() -> None:
     op_ed_2 = get_article_body(link_2, "div.story > span > p")
     op_eds.append(op_ed_2)
 
-    link_3 = "https://www.thestar.com/opinion/editorials/2021/01/07/curfew-would-be-dramatic-but-an-admission-of-failure-in-fight-against-covid-19.html"
-    op_ed_3 = get_article_body(link_3, "div.c-article-body__content > p.text-block-container")
+    link_3 = "https://www.cbc.ca/news/canada/saskatchewan/opinion-martha-neovard-new-year-unresolution-1.5863819"
+    op_ed_3 = get_article_body(link_3, "div.story > span > p")
     op_eds.append(op_ed_3)
 
-    link_4 = "https://www.cnn.com/2021/01/05/opinions/uk-delay-second-covid-vaccine-dose-moore/index.html"
-    op_ed_4 = get_article_body(link_4, "div.zn-body__paragraph")
+    link_4 = "https://www.cbc.ca/news/canada/saskatchewan/comedy-craig-silliphant-early-xmas-1.5808227"
+    op_ed_4 = get_article_body(link_4, "div.story > span > p")
     op_eds.append(op_ed_4)
 
-    np.save(ROOT / "data/op_eds", op_eds)
+    link_5 = "https://vancouversun.com/opinion/editorials/editorial-trudeaus-lack-of-humility-is-bad-politics"
+    op_ed_5 = get_article_body(link_5, "section.article-content > p")
+    op_eds.append(op_ed_5)
+
+    link_6 = "https://vancouversun.com/opinion/columnists/lilley-mengs-lifestyle-family-visit-in-vancouver-simply-outrageous/wcm/b4f18898-4f48-4b37-93be-c262d18f1e6c"
+    op_ed_6 = get_article_body(link_6, "section.article-content > p")
+    op_eds.append(op_ed_6)
+
+    link_7 = "https://www.thestar.com/opinion/editorials/2021/01/07/curfew-would-be-dramatic-but-an-admission-of-failure-in-fight-against-covid-19.html"
+    op_ed_7 = get_article_body(link_7, "div.c-article-body__content > p.text-block-container")
+    op_eds.append(op_ed_7)
+
+    link_8 = "https://www.cnn.com/2021/01/05/opinions/uk-delay-second-covid-vaccine-dose-moore/index.html"
+    op_ed_8 = get_article_body(link_8, "div.zn-body__paragraph")
+    op_eds.append(op_ed_8)
+
+    np.save(ROOT / "outputs/op_eds", op_eds)
 
     # Initialize a two-dimensional list of scientific papers
     papers = []
 
-    link_5 = "https://www.nejm.org/doi/10.1056/NEJMoa2035389"
-    paper_1 = get_article_body(link_5, "p.f-body, p.f-body--sm")
+    link_9 = "https://www.nejm.org/doi/10.1056/NEJMoa2035389"
+    paper_1 = get_article_body(link_9, "p.f-body, p.f-body--sm")
     papers.append(paper_1)
 
-    link_6 = "https://www.nejm.org/doi/full/10.1056/NEJMoa2034545"
-    paper_2 = get_article_body(link_6, "p.f-body, p.f-body--sm")
+    link_10 = "https://www.nejm.org/doi/full/10.1056/NEJMoa2034545"
+    paper_2 = get_article_body(link_10, "p.f-body, p.f-body--sm")
     papers.append(paper_2)
 
-    link_7 = "https://www.nejm.org/doi/full/10.1056/NEJMoa2016638"
-    paper_3 = get_article_body(link_7, "p.f-body, p.f-body--sm")
+    link_11 = "https://www.nejm.org/doi/full/10.1056/NEJMoa2016638"
+    paper_3 = get_article_body(link_11, "p.f-body, p.f-body--sm")
     papers.append(paper_3)
 
-    link_8 = "https://www.nejm.org/doi/full/10.1056/NEJMoa2019375"
-    paper_4 = get_article_body(link_8, "p.f-body, p.f-body--sm")
+    link_12 = "https://www.nejm.org/doi/full/10.1056/NEJMoa2019375"
+    paper_4 = get_article_body(link_12, "p.f-body, p.f-body--sm")
     papers.append(paper_4)
 
-    np.save(ROOT / "data/papers", papers)
+    np.save(ROOT / "outputs/papers", papers)
 
     # Initialize a two-dimensional list of children's short stories
     short_stories = []
 
-    link_9 = "https://www.freechildrenstories.com/the-great-hill"
-    story_1 = get_article_body(link_9, "div.sqs-block-content > p")
+    link_13 = "https://www.freechildrenstories.com/the-great-hill"
+    story_1 = get_article_body(link_13, "div.sqs-block-content > p")
     short_stories.append(story_1)
 
-    link_10 = "https://www.freechildrenstories.com/the-particular-way-of-the-odd-ms-mckay"
-    story_2 = get_article_body(link_10, "div.sqs-block-content > p")
+    link_14 = "https://www.freechildrenstories.com/the-particular-way-of-the-odd-ms-mckay"
+    story_2 = get_article_body(link_14, "div.sqs-block-content > p")
     short_stories.append(story_2)
 
-    link_11 = "https://www.freechildrenstories.com/the-stellar-one-1"
-    story_3 = get_article_body(link_11, "div.sqs-block-content > p")
+    link_15 = "https://www.freechildrenstories.com/the-stellar-one-1"
+    story_3 = get_article_body(link_15, "div.sqs-block-content > p")
     short_stories.append(story_3)
 
-    link_12 = "https://www.freechildrenstories.com/king-michael"
-    story_4 = get_article_body(link_12, "div.sqs-block-content > p")
+    link_16 = "https://www.freechildrenstories.com/king-michael"
+    story_4 = get_article_body(link_16, "div.sqs-block-content > p")
     short_stories.append(story_4)
 
-    np.save(ROOT / "data/short_stories", short_stories)
+    np.save(ROOT / "outputs/short_stories", short_stories)
 
 
 def plot_article_sentiment(article: List[str], title: str, model: Sequential) -> None:
@@ -274,6 +298,9 @@ def plot_article_sentiment(article: List[str], title: str, model: Sequential) ->
     plt.ylabel("sentiment")
     plt.xlabel("paragraph")
     plt.legend(["Sentiment History", "Mean"], loc="upper left")
+    df = pd.DataFrame(predictions)
+    # Append the summary statistics to the plot
+    plt.figtext(0.15, 0.15, df[0].describe().to_string())
     plt.savefig(ROOT / "figs" / "_".join(title.split(" ")).lower())
     plt.show()
 
@@ -293,15 +320,11 @@ if __name__ == "__main__":
     # web_scrape_text()
 
     # For each category of text, plot the sentiment history of each article of text
-    for idx, op_ed in enumerate(np.load(ROOT / "data/op_eds.npy", allow_pickle=True)):
+    for idx, op_ed in enumerate(np.load(ROOT / "outputs/op_eds.npy", allow_pickle=True)):
         plot_article_sentiment(op_ed, f"Sample Opinion Editorial #{idx + 1}", model)
 
-    for idx, paper in enumerate(np.load(ROOT / "data/papers.npy", allow_pickle=True)):
+    for idx, paper in enumerate(np.load(ROOT / "outputs/papers.npy", allow_pickle=True)):
         plot_article_sentiment(paper, f"Sample Paper #{idx + 1}", model)
 
-    for idx, story in enumerate(np.load(ROOT / "data/short_stories.npy", allow_pickle=True)):
+    for idx, story in enumerate(np.load(ROOT / "outputs/short_stories.npy", allow_pickle=True)):
         plot_article_sentiment(story, f"Sample Short Story #{idx + 1}", model)
-
-
-
-
