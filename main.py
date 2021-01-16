@@ -108,7 +108,7 @@ def retrieve_data() -> Tuple[PrefetchDataset, PrefetchDataset]:
     # An in-depth explanation of this step can be found at https://www.tensorflow.org/guide/data_performance#prefetching
     train_dataset = train_dataset.prefetch(tf.data.experimental.AUTOTUNE)
 
-    # Repeat above steps for training dataset (except shuffling)
+    # Repeat above steps for testing dataset (except shuffling)
     test_dataset = test_dataset.batch(BATCH_SIZE).prefetch(tf.data.experimental.AUTOTUNE)
 
     return train_dataset, test_dataset
